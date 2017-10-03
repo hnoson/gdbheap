@@ -64,7 +64,7 @@ Usage:
                     if len(fd_chain) > 6:
                         fd_chain = fd_chain[:6] + '...'
                     fd = ' --> '.join(map(str,fd_chain))
-                if chunk['in_use'] or chunk['size'] <= 0x12 * word:
+                if chunk['in_use'] or (chunk['size'] & ~7) <= 0x10 * word:
                     bk = str(chunk['bk'])
                 else:
                     bk_chain = examine_backward_chain(chunk['bk'])
@@ -98,7 +98,7 @@ def get_chunk_info():
         if not size & 1:
             chunks[val_to_int(addr - prev_size / word)]['in_use'] = False
         addr += (size & ~7) / word
-    for i in range(10):
+    for i in range(7):
         addr = fastbins[i]
         while addr > 0:
             chunks[val_to_int(addr)]['in_use'] = False
