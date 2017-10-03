@@ -101,6 +101,11 @@ def get_chunk_info():
     for i in range(7):
         addr = fastbins[i]
         while addr > 0:
+            if val_to_int(addr) not in chunks:
+                print('[!] fastbin is corrupted.')
+                break
+            if not chunks[val_to_int(addr)]['in_use']:
+                break
             chunks[val_to_int(addr)]['in_use'] = False
             addr = cast_pointer(addr,'long')
             addr = (addr + 2).referenced_value()
