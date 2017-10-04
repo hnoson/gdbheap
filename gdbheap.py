@@ -1,6 +1,7 @@
 import gdb
 import sys
 import string
+from collections import OrderedDict
 
 class Heap(gdb.Command):
     '''Display heap chunks
@@ -13,6 +14,7 @@ Usage:
 
     def invoke(self, args, from_tty):
         self.dont_repeat()
+        args = args.split(' ')
         try:
             chunks, heap_base = get_chunk_info()
         except TypeError:
@@ -27,22 +29,8 @@ Usage:
         arch, bits = peda.getarch()
         word = bits // 8
 
-        args = args.split(' ')
-        start = 0
-        if len(args[0]) > 0:
-            if all([x.isdigit() for x in args[0]]):
-                start = int(args[0])
-            elif args[0][:2] == '0x' and all([x in string.hexdigits for x in args[0][2:]]):
-                addr = int(args[0],16)
-                start = -1
-                for index, c_addr in enumerate(sorted(chunks.keys())):
-                    if addr == c_addr or addr == c_addr + 2 * word:
-                        start = index
-                if start < 0:
-                    print('No chunk is allocated at %#x' % addr)
-                    return
-
-        for index, addr in enumerate(sorted(chunks.keys())):
+        start = get_index(args[0]) if len(args[0]) > 0 else 0
+        for index, addr in enumerate(chunks):
             chunk = chunks[addr]
             if index >= start:
                 if index > start and (index - start) % 4 == 0:
@@ -74,6 +62,40 @@ Usage:
                 print('fd\t : %s' % fd)
                 print('bk\t : %s' % bk)
 
+class HeapDump(gdb.Command):
+    '''Dump heap chunk
+Usage:
+    heap_dump index(dec)
+    heap_dump address(hex)'''
+    def __init__(self):
+        gdb.Command.__init__(self,"heap_dump",gdb.COMMAND_DATA)
+
+    def invoke(self, args, from_tty):
+        self.dont_repeat()
+        if len(args) == 0:
+            print(self.__doc__)
+            return
+        args = args.split(' ')
+        try:
+            chunks, heap_base = get_chunk_info()
+        except TypeError:
+            print('No symbol table is loaded.')
+            return
+        if heap_base == 0:
+            print('heap area is not allocated.')
+            return
+        arch,bits = peda.getarch()
+        word = bits // 8
+        index = get_index(args[0])
+        if index is None:
+            return
+        addr = list(chunks.keys())[index]
+        chunk = chunks[addr]
+        _type = 'g' if word == 8 else 'w'
+        words = (chunk['size'] & ~7) / word
+        gdb.execute('x/%d%cx %#x' % (words,_type,addr))
+
+@memoized
 def get_chunk_info():
     try:
         top = gdb.parse_and_eval('main_arena.top')
@@ -84,7 +106,7 @@ def get_chunk_info():
     arch, bits = peda.getarch()
     word = bits // 8
     addr = cast_pointer(heap_base,'long')
-    chunks = {}
+    chunks = OrderedDict()
     while addr < top:
         chunks[val_to_int(addr)] = {
                 'prev_size': addr.referenced_value(),
@@ -110,6 +132,30 @@ def get_chunk_info():
             addr = cast_pointer(addr,'long')
             addr = (addr + 2).referenced_value()
     return chunks,val_to_int(heap_base)
+
+def get_index(num):
+    chunks,heap_base = get_chunk_info()
+    try:
+        index = int(num)
+        if index >= 0 and index < len(chunks):
+            return index
+        else:
+            print('out of range')
+            return None
+    except ValueError:
+        pass
+    try:
+        addr = int(num,16)
+    except ValueError:
+        return None
+
+    arch, bits = peda.getarch()
+    word = bits // 8
+    for index, c_addr in enumerate(sorted(chunks.keys())):
+        if addr == c_addr or addr == c_addr + 2 * word:
+            return index
+    print('No chunk is allocated at %#x.' % addr)
+    return None
 
 def examine_free_list(start,offset):
     arch, bits = peda.getarch()
@@ -153,3 +199,4 @@ def coloring(val,color):
     return dic[color] + str(val) + dic['reset']
 
 Heap()
+HeapDump()
