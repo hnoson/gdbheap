@@ -1,6 +1,6 @@
 # gdbheap
 
-gdbheap - Python Script Displaying Heap Information in GDB
+gdbheap - Python Script displaying heap information in GDB
 
 ## Installation
 
