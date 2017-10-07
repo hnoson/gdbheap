@@ -89,10 +89,14 @@ Usage:
         index = get_index(args[0])
         if index is None:
             return
-        addr = list(chunks.keys())[index]
-        chunk = chunks[addr]
+        if index == len(chunks):
+            addr = int(cast(gdb.parse_and_eval('main_arena.top'),'int'))
+            words = 2
+        else:
+            addr = list(chunks.keys())[index]
+            chunk = chunks[addr]
+            words = (chunk['size'] & ~7) / word
         _type = 'g' if word == 8 else 'w'
-        words = (chunk['size'] & ~7) / word
         gdb.execute('x/%d%cx %#x' % (words,_type,addr))
 
 @memoized
@@ -137,7 +141,7 @@ def get_index(num):
     chunks,heap_base = get_chunk_info()
     try:
         index = int(num)
-        if index >= 0 and index < len(chunks):
+        if index >= 0 and index <= len(chunks):
             return index
         else:
             print('out of range')
