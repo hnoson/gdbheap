@@ -95,7 +95,7 @@ Usage:
         else:
             addr = list(chunks.keys())[index]
             chunk = chunks[addr]
-            words = (chunk['size'] & ~7) / word
+            words = (chunk['size'] & ~7) / word + 2
         _type = 'g' if word == 8 else 'w'
         gdb.execute('x/%d%cx %#x' % (words,_type,addr))
 
